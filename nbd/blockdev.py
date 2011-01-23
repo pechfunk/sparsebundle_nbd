@@ -30,6 +30,7 @@ class BandBlockDevice(object):
         return self.size
 
     def read(self, offset, size):
+        "Read size bytes from the volume, starting at volume offset offset. Generator for strings."
         if offset < 0:
             raise BlockDeviceException('negative offset: '+offset)
         if size < 0:
@@ -51,5 +52,31 @@ class BandBlockDevice(object):
             yield f.read(s)
             o = 0
             i += 1
+
+    def write(self, offset, data):
+        if offset < 0:
+            raise BlockDeviceException('negative offset: '+offset)
+        if offset + len(data) > self.size:
+            raise BlockDeviceException('attempted to write past end of sparse bundle')
+
+        i = offset / self.bandSize
+        o = offset % self.bandSize
+        remSize = len(data)
+        so = 0
+        while remSize > 0:
+            f = self.bandFileFactory.getBand(i)
+            f.seek(o, 0)
+            if o + remSize > self.bandSize:
+                s = self.bandSize - o
+            else:
+                s = remSize
+            remSize -= s
+            f.write(data[so : so+s])
+            so += s
+            o = 0
+            i += 1
+
+
+
 
 

@@ -4,10 +4,9 @@ Created on 16.01.2011
 @author: konrad
 '''
 from twisted.trial import unittest
-try:
-    from cStringIO import StringIO
-except:
-    from StringIO import StringIO
+
+# StringIO: need Python version so that StringIO('bla') is writable
+from StringIO import StringIO
 
 from nbd.blockdev import BandBlockDevice, BlockDeviceException
 
@@ -20,16 +19,16 @@ class DummyFileFactory(object):
         assert 0 <= k < self.numBands
         return self.bands[k]
     
-    def extract(self):
-        'a list, containing each band\'s contents in a string'
-        return [str(x) for x in self.bands]
+    def bandContents(self):
+        'a tuple, containing each band\'s contents in a string'
+        return tuple([x.getvalue() for x in self.bands])
 
 def y(strs):
     return ''.join(strs)
 
-class BandBlockDeviceTest(unittest.TestCase):
+class BandBlockDeviceReadTest(unittest.TestCase):
     '''
-    Unit test for BandBlockDevice
+    Unit test for BandBlockDevice involving reading
     '''
 
     BAND_SIZE=8
@@ -41,7 +40,6 @@ class BandBlockDeviceTest(unittest.TestCase):
         dff = DummyFileFactory(['ABCDEFGH', 'abcdefgh', '01234567'])
         bd = BandBlockDevice(numBands, bandSize, dff)
         return bd
-
 
     def test_read_full_first_band(self):
         bd = self._makeBBD()
@@ -102,3 +100,25 @@ class BandBlockDeviceTest(unittest.TestCase):
         "test the y helper"
         self.assertEquals('ABCdefGHI', y(x for x in ('ABC','def','GHI')))
     
+class BandBlockDeviceWritingTest(unittest.TestCase):
+    "Unit test for write calls in BandBlockDevice"
+
+    def setUp(self):
+        self.numBands = 3
+        self.origBandContents =('ABCDEFGH', 'abcdefgh', '01234567')
+        self.bandSize = 8
+        self.dff = DummyFileFactory(self.origBandContents)
+        self.bd = BandBlockDevice(self.numBands, self.bandSize, self.dff)
+
+    def test_write0(self):
+        self.bd.write(5, '')
+        self.assertEquals(self.dff.bandContents(), self.origBandContents)
+    
+    def test_write_within_band(self):
+        self.bd.write(9, 'UVW')
+        self.assertEquals(self.dff.bandContents(), ('ABCDEFGH', 'aUVWefgh', '01234567'))
+
+    def test_write_spanning_bands(self):
+        self.bd.write(7, 'Borstenvieh')
+        self.assertEquals(self.dff.bandContents(), ('ABCDEFGB','orstenvi', 'eh234567'))
+
