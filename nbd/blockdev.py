@@ -34,15 +34,22 @@ class BandBlockDevice(object):
             raise BlockDeviceException('negative offset: '+offset)
         if size < 0:
             raise BlockDeviceException('negative size')
-
         if offset+size > self.size :
             raise BlockDeviceException('attempted to read past end of sparse bundle')
-        bandIndex = offset / self.bandSize
-        bandOffset = offset % self.bandSize
-        if bandOffset+size > self.bandSize:
-            raise NotImplementedError('not implemented: requests spanning')
-        else:
-            f = self.bandFileFactory.getBand(bandIndex)
-            f.seek(bandOffset, 0)
-            yield f.read(size)
+        
+        i = offset / self.bandSize
+        o = offset % self.bandSize
+        remSize = size
+        while remSize > 0:
+            f = self.bandFileFactory.getBand(i)
+            f.seek(o, 0)
+            if o + remSize > self.bandSize:
+                s = self.bandSize - o
+            else:
+                s = remSize
+            remSize -= s
+            yield f.read(s)
+            o = 0
+            i += 1
+
 

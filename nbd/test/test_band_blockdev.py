@@ -76,9 +76,29 @@ class BandBlockDeviceTest(unittest.TestCase):
             s = bd.read(25, 1)
         except BlockDeviceException, e:
             pass
+
+    def test_read_overlap_one_boundary_from_start(self):
+        bd = self._makeBBD()
+        s = bd.read(0, 10)
+        self.assertEquals('ABCDEFGHab', y(s))
+
+    def test_read_overlap_one_boundary(self):
+        bd = self._makeBBD()
+        s = bd.read(6, 4)
+        self.assertEquals('GHab', y(s))
+
+    def test_read_overlap_two_boundaries(self):
+        bd = self._makeBBD()
+        s = bd.read(6, 11)
+        self.assertEquals('GHabcdefgh0', y(s))
+
         
     def test_size_bytes(self):
         bd = self._makeBBD()
         size = bd.sizeBytes()
         self.assertEquals(24, size)
+
+    def test_y(self):
+        "test the y helper"
+        self.assertEquals('ABCdefGHI', y(x for x in ('ABC','def','GHI')))
     
