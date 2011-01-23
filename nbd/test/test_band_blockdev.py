@@ -24,6 +24,8 @@ class DummyFileFactory(object):
         'a list, containing each band\'s contents in a string'
         return [str(x) for x in self.bands]
 
+def y(strs):
+    return ''.join(strs)
 
 class BandBlockDeviceTest(unittest.TestCase):
     '''
@@ -44,22 +46,22 @@ class BandBlockDeviceTest(unittest.TestCase):
     def test_read_full_first_band(self):
         bd = self._makeBBD()
         s = bd.read(0, self.BAND_SIZE)
-        self.assertEquals('ABCDEFGH', s)
+        self.assertEquals('ABCDEFGH', y(s))
 
     def test_read_full_middle_band(self):
         bd = self._makeBBD()
         s = bd.read(self.BAND_SIZE, self.BAND_SIZE)
-        self.assertEquals('abcdefgh', s)
+        self.assertEquals('abcdefgh', y(s))
 
     def test_read_full_last_band(self):
         bd = self._makeBBD()
         s = bd.read(2*self.BAND_SIZE, self.BAND_SIZE)
-        self.assertEquals('01234567', s)
+        self.assertEquals('01234567', y(s))
 
     def test_read_part_of_middle_band(self):
         bd = self._makeBBD()
         s = bd.read(self.BAND_SIZE+3, 2)
-        self.assertEquals('de', s)
+        self.assertEquals('de', y(s))
 
     def test_error_read_overlaps_end(self):
         bd = self._makeBBD()

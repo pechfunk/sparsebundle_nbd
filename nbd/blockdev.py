@@ -41,8 +41,8 @@ class BandBlockDevice(object):
         bandOffset = offset % self.bandSize
         if bandOffset+size > self.bandSize:
             raise NotImplementedError('not implemented: requests spanning')
-        
-        f = self.bandFileFactory.getBand(bandIndex)
-        f.seek(bandOffset, 0)
-        return f.read(size)
+        else:
+            f = self.bandFileFactory.getBand(bandIndex)
+            f.seek(bandOffset, 0)
+            yield f.read(size)
 
