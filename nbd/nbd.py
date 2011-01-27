@@ -34,12 +34,12 @@ class ReadRequest(object):
         self.transport = transport
         self.blockdev = blockdev
     def run(self):
-        defer.maybeDeferred(self.blockdev.read, 
-                            self.offset, 
-                            self.length).addBoth(self._answerData, self._answerReadError)
-    def _answerData(self, data):
+        self._answerReadResponseHeader()
+        for s in self.blockdev.read(self.offset, self.length):
+            self.transport.write(s)
+    def _answerReadResponseHeader(self):
         assert type(self.handle) is type('') and len(self.handle) == 8
-        msg = '\x67\x44\x66\x98' + struct.pack('>L', 0) + self.handle + data
+        msg = '\x67\x44\x66\x98' + struct.pack('>L', 0) + self.handle 
         self.transport.write(msg)
     def _answerReadError(self, *args):
         raise Exception("not implemented")
@@ -76,20 +76,19 @@ class NBDServerProtocol(protocol.Protocol):
         '''
         Constructor
         '''
-        super(NBDServerProtocol, self).__init__()
         self._blockdev = blockdev
         self._readBuffer = ''
         
     def connectionMade(self):
         size = self._blockdev.sizeBytes()
-        self.transport.write(self.SERVER_MAGIC + struct.pack('>Q', size) + '\0' * 128)
+        self.transport.write(self.SERVER_MAGIC + struct.pack('>Q', size) + '\0' * 124)
         
     def dataReceived(self, bs):
         self._readBuffer = self._readBuffer + bs
         numBytesUsed, request = self.parseRequest(self._readBuffer)
         if request is not None :
             self._readBuffer = self._readBuffer[numBytesUsed:]
-            self.processRequest(request)
+            request.run()
         
     def parseRequest(self, msgBytes):
         """
@@ -120,5 +119,3 @@ class NBDServerProtocol(protocol.Protocol):
         else:
             return (0, None)
             
-    def processRequest(self, request):
-        request.run(self._blockdev, self.transport)
