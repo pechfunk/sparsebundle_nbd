@@ -12,6 +12,9 @@ class DummyTransport(object):
     def __str__(self):
         return ''.join(self.writtens)
 
+REQUEST_MAGIC = '\x25\x60\x95\x13'
+RESPONSE_MAGIC = '\x67\x44\x66\x98'
+
 class NBDServerTest(unittest.TestCase):
     def setUp(self):
         self.bd = bd = StringBlockDevice('ABCDEFGHIJKL')
@@ -30,18 +33,82 @@ class NBDServerTest(unittest.TestCase):
     def test_valid_read_request(self):
         self.prot.connectionMade()
         self.dt.reset()
-        self.prot.dataReceived('\x25\x60\x95\x13' \
+        self.prot.dataReceived(REQUEST_MAGIC \
             + '\x00\x00\x00\x00' \
             + 'Duisburg' \
             + '\x00\x00\x00\x00\x00\x00\x00\x04' \
             + '\x00\x00\x00\x05')
         self.assertEquals(
-            '\x67\x44\x66\x98' \
+            RESPONSE_MAGIC \
             + '\x00\x00\x00\x00' \
             + 'Duisburg'
             + 'EFGHI', 
             str(self.dt))
         
+    def test_split_read_request(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        self.prot.dataReceived(REQUEST_MAGIC \
+            + '\x00\x00\x00\x00Duis')
+        self.prot.dataReceived(
+             'burg' \
+            + '\x00\x00\x00\x00\x00\x00\x00\x04' \
+            + '\x00\x00\x00')
+        self.prot.dataReceived('\x05')
+        self.assertEquals(
+            RESPONSE_MAGIC \
+            + '\x00\x00\x00\x00' \
+            + 'Duisburg'
+            + 'EFGHI', 
+            str(self.dt))
 
+    def test_valid_write_request(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        self.prot.dataReceived(REQUEST_MAGIC
+            + '\x00\x00\x00\x01'
+            + 'Hannover'
+            + '\x00\x00\x00\x00\x00\x00\x00\x03'
+            + '\x00\x00\x00\x04'
+            + 'wxyz')
+        self.assertEquals(RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Hannover',
+            str(self.dt))
+        self.assertEquals('ABCwxyzHIJKL', str(self.bd))
+
+    def test_split_write_request(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        self.prot.dataReceived(REQUEST_MAGIC
+            + '\x00\x00\x00\x01'
+            + 'Hannover'
+            + '\x00\x00\x00\x00\x00\x00\x00\x03'
+            + '\x00\x00\x00\x04'
+            + 'w')
+        self.prot.dataReceived('x')
+        self.prot.dataReceived('yz')
+        self.assertEquals(RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Hannover',
+            str(self.dt))
+        self.assertEquals('ABCwxyzHIJKL', str(self.bd))
+
+    def test_multiple_queued_write_requests(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        self.prot.dataReceived(
+            REQUEST_MAGIC
+            + '\x00\x00\x00\x01'
+            + 'Hannover'
+            + '\x00\x00\x00\x00\x00\x00\x00\x09'
+            + '\x00\x00\x00\x02'
+            + 'st'
+            + REQUEST_MAGIC
+            + '\x00\x00\x00\x01'
+            + 'Budapest'
+            + '\x00\x00\x00\x00\x00\x00\x00\x03'
+            + '\x00\x00\x00\x04'
+            + 'wxyz')
+        self.assertEquals(RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Hannover' \
+            + RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Budapest',
+            str(self.dt))
+        self.assertEquals('ABCwxyzHIstL', str(self.bd))
 
 
