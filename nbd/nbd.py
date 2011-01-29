@@ -19,25 +19,6 @@ CMD_READ = 0
 CMD_WRITE = 1
 CMD_DISCONNECT = 2
 
-class StringBlockDevice(object):
-    '''
-    String posing as block device
-    '''
-    def __init__(self, s):
-        self.s = s
-    def sizeBytes(self):
-        return len(self.s)
-    def read(self, offset, length):
-        assert offset >= 0
-        assert offset + length <= len(self.s)
-        return self.s[offset:offset+length] 
-    def write(self, offset, payload):
-        assert offset >= 0
-        assert offset + len(payload) <= len(self.s)
-        self.s = self.s[:offset] + payload + self.s[offset+len(payload):]
-    def __str__(self):
-        return self.s
-
 class Error(Exception):
     pass
 
@@ -50,10 +31,6 @@ class BaseState(object):
         assert type(handle) is type('') and len(handle) == 8
         msg = '\x67\x44\x66\x98' + struct.pack('>L', errCode) + handle 
         self.transport.write(msg)
-
-
-
-
         
 class WriteState(BaseState):
     def __init__(self, blockdev, transport, handle, offset, length):

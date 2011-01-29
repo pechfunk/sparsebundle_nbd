@@ -1,6 +1,6 @@
 from twisted.trial import unittest
 
-from nbd.nbd import NBDServerProtocol, StringBlockDevice
+from nbd.nbd import NBDServerProtocol
 
 class DummyTransport(object):
     def __init__(self):
@@ -11,6 +11,25 @@ class DummyTransport(object):
         self.writtens = []
     def __str__(self):
         return ''.join(self.writtens)
+
+class StringBlockDevice(object):
+    '''
+    String posing as block device
+    '''
+    def __init__(self, s):
+        self.s = s
+    def sizeBytes(self):
+        return len(self.s)
+    def read(self, offset, length):
+        assert offset >= 0
+        assert offset + length <= len(self.s)
+        return self.s[offset:offset+length] 
+    def write(self, offset, payload):
+        assert offset >= 0
+        assert offset + len(payload) <= len(self.s)
+        self.s = self.s[:offset] + payload + self.s[offset+len(payload):]
+    def __str__(self):
+        return self.s
 
 REQUEST_MAGIC = '\x25\x60\x95\x13'
 RESPONSE_MAGIC = '\x67\x44\x66\x98'
