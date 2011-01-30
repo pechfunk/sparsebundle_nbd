@@ -5,10 +5,13 @@ from nbd.nbd import NBDServerProtocol
 class DummyTransport(object):
     def __init__(self):
         self.writtens = [ ]
+        self.connectionLost = False
     def write(self, s):
         self.writtens.append(s)
     def reset(self):
         self.writtens = []
+    def loseConnection(self):
+        self.connectionLost = True
     def __str__(self):
         return ''.join(self.writtens)
 
@@ -130,4 +133,15 @@ class NBDServerTest(unittest.TestCase):
             str(self.dt))
         self.assertEquals('ABCwxyzHIstL', str(self.bd))
 
+
+    def test_close(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        self.prot.dataReceived(REQUEST_MAGIC
+            + '\x00\x00\x00\x02'
+            + 'Augsburg'
+            + '\x00\x00\x00\x00\x00\x00\x00\x00'
+            + '\x00\x00\x00\x00')
+        self.assertEquals('', str(self.dt))
+        self.assertTrue(self.dt.connectionLost)
 
