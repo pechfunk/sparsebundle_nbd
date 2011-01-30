@@ -22,18 +22,56 @@ class StringBlockDevice(object):
     '''
     def __init__(self, s):
         self.s = s
+        self.stutterMode = False
     def sizeBytes(self):
         return len(self.s)
     def read(self, offset, length):
         assert offset >= 0
         assert offset + length <= len(self.s)
-        return self.s[offset:offset+length] 
+        result = self.s[offset:offset+length] 
+        if self.stutterMode:
+            for c in result:
+                yield c
+        else:
+            yield result
     def write(self, offset, payload):
         assert offset >= 0
         assert offset + len(payload) <= len(self.s)
         self.s = self.s[:offset] + payload + self.s[offset+len(payload):]
     def __str__(self):
         return self.s
+
+class FailAfterWrapper(object):
+    def __init__(self, f, numGoodCalls, exc, args):
+        self.f = f
+        self.numGoodCalls = numGoodCalls
+        self.callsSoFar = 0
+        self.exc = exc
+        self.excArgs = args
+
+    def __call__(self, *a, **kwa):
+        self.callsSoFar += 1
+        if self.callsSoFar > self.numGoodCalls:
+            raise (self.exc)(*self.excArgs)
+        else:
+            return (self.f)(*a,**kwa)
+
+class GeneratorFailAfterWrapper(object):
+    def __init__(self, f, numGoodCalls, exc, args):
+        self.f = f
+        self.numGoodCalls = numGoodCalls
+        self.exc = exc
+        self.excArgs = args
+    def __call__(self, *a, **kwa):
+        gen = (self.f)(*a, **kwa)
+        i = 0
+        for x in gen:
+            i += 1
+            if i > self.numGoodCalls:
+                raise (self.exc)(*self.excArgs)
+            else:
+                yield x
+                
 
 REQUEST_MAGIC = '\x25\x60\x95\x13'
 RESPONSE_MAGIC = '\x67\x44\x66\x98'
@@ -162,3 +200,44 @@ class NBDServerTest(unittest.TestCase):
         self.assertEquals(RESPONSE_MAGIC, a)
         self.assertEquals('Leberkas', c)
         self.assertEquals(99, b)
+
+    def test_read_error_read_error_in_second_blockdev_read(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        self.bd.stutterMode = True
+        self.bd.read = GeneratorFailAfterWrapper(self.bd.read, 1, IOError, (98, 'wuff'))
+        self.prot.dataReceived(REQUEST_MAGIC 
+            + '\x00\x00\x00\x00'
+            + 'Leberkas'
+            + '\x00\x00\x00\x00\x00\x00\x00\x00'
+            + '\x00\x00\x00\x03')
+        resp = str(self.dt)
+        self.assertEquals(struct.pack('>4sI8s', RESPONSE_MAGIC, 98, 'Leberkas'),
+            resp)
+
+class FailAfterWrapperTest(unittest.TestCase):
+    def test_fails_after_n_times(self):
+        def g(x):
+            return 2*x
+        gg = FailAfterWrapper(g, 1, IOError, (98, 'wuff'))
+        self.assertEquals(18, gg(9))
+        try:
+            gg(10)
+            self.fail()
+        except IOError,e:
+            self.assertEquals(98, e.errno)
+    def test_generator_fails_after_n_times(self):
+        def h(x):
+            yield x+1
+            yield x+2
+            yield x+3
+        gg = GeneratorFailAfterWrapper(h, 1, IOError, (98, 'wuff'))
+        s = gg(5)
+        self.assertEquals(6, s.next())
+        try:
+            s.next()
+            self.fail()
+        except IOError,e:
+            self.assertEquals(98, e.errno)
+
+

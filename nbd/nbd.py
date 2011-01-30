@@ -99,12 +99,12 @@ class ReadyState(BaseState):
             
     def _read(self, handle, offset, length):
         try:
-            firstBlock = True
-            for s in self.blockdev.read(offset, length):
-                if firstBlock:
-                    self._writeResponseHeader(0, handle)
-                    firstBlock=False
-                self.transport.write(s)
+            # I have to read all segments in advance so that I know what
+            # error code to put into the response header.
+            segs = list(self.blockdev.read(offset, length))
+            self._writeResponseHeader(0, handle)
+            for seg in segs:
+                self.transport.write(seg)
         except IOError, e:
             self._writeResponseHeader(e.errno, handle)
 
