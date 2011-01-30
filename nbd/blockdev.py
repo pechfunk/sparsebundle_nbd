@@ -1,11 +1,15 @@
+from errno import EINVAL
 '''
 Block devices
 '''
-class BlockDeviceException(Exception):
+class BlockDeviceException(IOError):
     '''
     A BlockDevice could not serve a request because the request
     was invalid. 
     '''
+    def __init__(self, msg):
+        super(BlockDeviceException, self).__init__(EINVAL, msg)
+
 
 class BandBlockDevice(object):
     '''

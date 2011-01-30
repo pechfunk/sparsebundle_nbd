@@ -1,3 +1,4 @@
+import struct
 from twisted.trial import unittest
 
 from nbd.nbd import NBDServerProtocol
@@ -145,3 +146,19 @@ class NBDServerTest(unittest.TestCase):
         self.assertEquals('', str(self.dt))
         self.assertTrue(self.dt.connectionLost)
 
+    def test_read_error_read_error_in_first_blockdev_read(self):
+        self.prot.connectionMade()
+        self.dt.reset()
+        def f(*args,**kwargs):
+            raise IOError(99, 'Foo error')
+        self.bd.read = f
+        self.prot.dataReceived(REQUEST_MAGIC 
+            + '\x00\x00\x00\x00'
+            + 'Leberkas'
+            + '\x00\x00\x00\x00\x00\x00\x00\x10'
+            + '\x00\x00\x00\x01')
+        resp = str(self.dt)
+        a,b,c = struct.unpack('>4sI8s', resp)
+        self.assertEquals(RESPONSE_MAGIC, a)
+        self.assertEquals('Leberkas', c)
+        self.assertEquals(99, b)

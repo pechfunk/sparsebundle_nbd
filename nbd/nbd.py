@@ -49,12 +49,16 @@ class WriteState(BaseState):
             state = self
             bytesRead = len(bs)
 
-        self.blockdev.write(self.offset, data)
-        self.remainingLength -= bytesRead
-        self.offset += bytesRead
+        try:
+            self.blockdev.write(self.offset, data)
+            self.remainingLength -= bytesRead
+            self.offset += bytesRead
 
-        if self.remainingLength == 0:
-            self._writeResponseHeader(0, self.handle)
+            if self.remainingLength == 0:
+                self._writeResponseHeader(0, self.handle)
+        except IOError, e:
+            self._writeResponseHeader(e.errno, self.handle)
+            state = ReadyState(transport = self.transport, blockdev = self.blockdev)
 
         return bytesRead, state
         
@@ -94,9 +98,15 @@ class ReadyState(BaseState):
             return (len(bs), self)
             
     def _read(self, handle, offset, length):
-        self._writeResponseHeader(0, handle)
-        for s in self.blockdev.read(offset, length):
-            self.transport.write(s)
+        try:
+            firstBlock = True
+            for s in self.blockdev.read(offset, length):
+                if firstBlock:
+                    self._writeResponseHeader(0, handle)
+                    firstBlock=False
+                self.transport.write(s)
+        except IOError, e:
+            self._writeResponseHeader(e.errno, handle)
 
 
 
