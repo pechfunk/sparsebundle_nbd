@@ -1,20 +1,8 @@
 import struct
 from twisted.trial import unittest
+from twisted.test.proto_helpers import StringTransport
 
 from nbd.nbd import NBDServerProtocol
-
-class DummyTransport(object):
-    def __init__(self):
-        self.writtens = [ ]
-        self.connectionLost = False
-    def write(self, s):
-        self.writtens.append(s)
-    def reset(self):
-        self.writtens = []
-    def loseConnection(self):
-        self.connectionLost = True
-    def __str__(self):
-        return ''.join(self.writtens)
 
 class StringBlockDevice(object):
     '''
@@ -80,20 +68,18 @@ class NBDServerTest(unittest.TestCase):
     def setUp(self):
         self.bd = bd = StringBlockDevice('ABCDEFGHIJKL')
         self.prot = prot = NBDServerProtocol( bd )
-        self.dt = dt = DummyTransport()
-        prot.transport = dt
+        self.dt = dt = StringTransport()
+        prot.makeConnection(dt)
 
     def test_welcome_handshake(self):
-        self.prot.connectionMade()
         self.assertEquals( 
             'NBDMAGIC' \
             + '\x00\x00\x42\x02\x81\x86\x12\x53' \
             + '\0\0\0\0\0\0\0\x0c' \
-            + '\0' * 124, str(self.dt))
+            + '\0' * 124, self.dt.value())
 
     def test_valid_read_request(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.prot.dataReceived(REQUEST_MAGIC \
             + '\x00\x00\x00\x00' \
             + 'Duisburg' \
@@ -104,11 +90,10 @@ class NBDServerTest(unittest.TestCase):
             + '\x00\x00\x00\x00' \
             + 'Duisburg'
             + 'EFGHI', 
-            str(self.dt))
+            self.dt.value())
         
     def test_split_read_request(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.prot.dataReceived(REQUEST_MAGIC \
             + '\x00\x00\x00\x00Duis')
         self.prot.dataReceived(
@@ -121,11 +106,10 @@ class NBDServerTest(unittest.TestCase):
             + '\x00\x00\x00\x00' \
             + 'Duisburg'
             + 'EFGHI', 
-            str(self.dt))
+            self.dt.value())
 
     def test_valid_write_request(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.prot.dataReceived(REQUEST_MAGIC
             + '\x00\x00\x00\x01'
             + 'Hannover'
@@ -133,12 +117,11 @@ class NBDServerTest(unittest.TestCase):
             + '\x00\x00\x00\x04'
             + 'wxyz')
         self.assertEquals(RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Hannover',
-            str(self.dt))
+            self.dt.value())
         self.assertEquals('ABCwxyzHIJKL', str(self.bd))
 
     def test_split_write_request(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.prot.dataReceived(REQUEST_MAGIC
             + '\x00\x00\x00\x01'
             + 'Hannover'
@@ -148,12 +131,11 @@ class NBDServerTest(unittest.TestCase):
         self.prot.dataReceived('x')
         self.prot.dataReceived('yz')
         self.assertEquals(RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Hannover',
-            str(self.dt))
+            self.dt.value())
         self.assertEquals('ABCwxyzHIJKL', str(self.bd))
 
     def test_multiple_queued_write_requests(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.prot.dataReceived(
             REQUEST_MAGIC
             + '\x00\x00\x00\x01'
@@ -169,24 +151,22 @@ class NBDServerTest(unittest.TestCase):
             + 'wxyz')
         self.assertEquals(RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Hannover' \
             + RESPONSE_MAGIC + '\x00\x00\x00\x00' + 'Budapest',
-            str(self.dt))
+            self.dt.value())
         self.assertEquals('ABCwxyzHIstL', str(self.bd))
 
 
     def test_close(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.prot.dataReceived(REQUEST_MAGIC
             + '\x00\x00\x00\x02'
             + 'Augsburg'
             + '\x00\x00\x00\x00\x00\x00\x00\x00'
             + '\x00\x00\x00\x00')
-        self.assertEquals('', str(self.dt))
-        self.assertTrue(self.dt.connectionLost)
+        self.assertEquals('', self.dt.value())
+        self.assertTrue(self.dt.disconnecting)
 
     def test_read_error_read_error_in_first_blockdev_read(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         def f(*args,**kwargs):
             raise IOError(99, 'Foo error')
         self.bd.read = f
@@ -195,15 +175,14 @@ class NBDServerTest(unittest.TestCase):
             + 'Leberkas'
             + '\x00\x00\x00\x00\x00\x00\x00\x10'
             + '\x00\x00\x00\x01')
-        resp = str(self.dt)
+        resp = self.dt.value()
         a,b,c = struct.unpack('>4sI8s', resp)
         self.assertEquals(RESPONSE_MAGIC, a)
         self.assertEquals('Leberkas', c)
         self.assertEquals(99, b)
 
     def test_read_error_read_error_in_second_blockdev_read(self):
-        self.prot.connectionMade()
-        self.dt.reset()
+        self.dt.clear()
         self.bd.stutterMode = True
         self.bd.read = GeneratorFailAfterWrapper(self.bd.read, 1, IOError, (98, 'wuff'))
         self.prot.dataReceived(REQUEST_MAGIC 
@@ -211,7 +190,7 @@ class NBDServerTest(unittest.TestCase):
             + 'Leberkas'
             + '\x00\x00\x00\x00\x00\x00\x00\x00'
             + '\x00\x00\x00\x03')
-        resp = str(self.dt)
+        resp = self.dt.value()
         self.assertEquals(struct.pack('>4sI8s', RESPONSE_MAGIC, 98, 'Leberkas'),
             resp)
 
