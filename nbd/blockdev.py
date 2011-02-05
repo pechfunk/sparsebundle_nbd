@@ -84,7 +84,94 @@ class BandBlockDevice(object):
             o = 0
             i += 1
 
+class AbstractPaddedFile(object):
+    def __init__(self, size):
+        self.size = size
+
+    def read(self, size):
+        """
+        Read bytes. Must give the expected size.
+        """
+        s, pos = self._innerRead(size)
+        if len(s) < size:
+            # the file read fewer bytes than the caller wanted.
+            # We owe the caller NULs all the way from the current
+            # position to the declared end.
+            maxPad = self.size - pos   # max that many bytes of padding
+            missing = size - len(s)    # how many NULs the caller expects
+            padSize = min(missing, maxPad)
+            s = s + (padSize * '\0')
+        return s
+
+    def seek(self, pos, whence=os.SEEK_SET):
+        self._doSeek(pos, whence)
+    
+    def _innerRead(self, size):
+        raise NotImplementedError()
+
+    def _doSeek(self, pos, whence):
+        raise NotImplementedError()
+
+class PaddedFile(AbstractPaddedFile):
+    """
+    Wrap a file, pretending it has been NUL-padded to a certain size.
+    """
+    def __init__(self, f, size):
+        super(PaddedFile, self).__init__(size)
+        self.f = f
+        self.pos = 0
+
+    def _innerRead(self, size):
+        s = self.f.read(size)
+        self.pos = self.f.tell()
+        return (s, self.pos)
+
+    def _doSeek(self, pos, whence):
+        self.f.seek(pos, whence)
+        self.pos = pos
+                
+class FixedSizeEmptyReadOnlyFile(AbstractPaddedFile):
+    def __init__(self, size):
+        super(FixedSizeEmptyReadOnlyFile, self).__init__( size)
+        self.pos = 0
+        self.hasSeekedSinceLastRead = True
+
+    def _innerRead(self, size):
+        assert self.hasSeekedSinceLastRead
+        self.hasSeekedSinceLastRead = False
+        return ('', self.pos)
+    
+    def _doSeek(self, pos, whence):
+        assert whence == os.SEEK_SET
+        self.pos = pos
+        self.hasSeekedSinceLastRead = True
 
 
-
+class BandFileFactory(object):
+    """
+    Find bands in an Apple-like bands directory.
+    Band numbers are hex numbers without leading 0s.
+    """
+    def __init__(self, dirName, bandSize, writable=False, fileCtor=file):
+        self.fileCtor = fileCtor
+        self.bandSize = bandSize
+        self.dirName = dirName
+        if writable:
+            self.openMode = 'r+b'
+        else:
+            self.openMode = 'rb'
+        
+    def getBand(self, index):
+        name = "%x"%index
+        fullName = os.path.join(self.dirName, name)
+        try:
+            f =  (self.fileCtor)(fullName, self.openMode)
+            wf =  PaddedFile(f, self.bandSize) 
+        except IOError, e:
+            if e.errno == errno.ENOENT:
+                wf = FixedSizeEmptyReadOnlyFile(self.bandSize)
+            else:
+                raise
+        return wf
+        
 
