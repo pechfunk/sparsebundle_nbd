@@ -57,7 +57,7 @@ class BandBlockDevice(object):
             else:
                 s = remSize
             remSize -= s
-            yield f.read(s)
+            yield f.read(s) #TODO may legally read less than s
             o = 0
             i += 1
 
