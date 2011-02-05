@@ -1,4 +1,8 @@
-from errno import EINVAL
+import os.path
+import os
+from StringIO import StringIO
+import errno
+
 '''
 Block devices
 '''
@@ -8,7 +12,7 @@ class BlockDeviceException(IOError):
     was invalid. 
     '''
     def __init__(self, msg):
-        super(BlockDeviceException, self).__init__(EINVAL, msg)
+        super(BlockDeviceException, self).__init__(errno.EINVAL, msg)
 
 
 class BandBlockDevice(object):
