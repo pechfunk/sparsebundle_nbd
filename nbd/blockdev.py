@@ -51,7 +51,7 @@ class BandBlockDevice(object):
         remSize = size
         while remSize > 0:
             f = self.bandFileFactory.getBand(i)
-            f.seek(o, 0)
+            f.seek(o, os.SEEK_SET)
             if o + remSize > self.bandSize:
                 s = self.bandSize - o
             else:
