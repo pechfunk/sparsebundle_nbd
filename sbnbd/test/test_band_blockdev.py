@@ -8,7 +8,7 @@ from twisted.trial import unittest
 # StringIO: need Python version so that StringIO('bla') is writable
 from StringIO import StringIO
 
-from nbd.blockdev import BandBlockDevice, BlockDeviceException
+from sbnbd.blockdev import BandBlockDevice, BlockDeviceException
 
 class DummyFileFactory(object):
     def __init__(self, bandContents):

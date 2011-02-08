@@ -2,7 +2,7 @@ import struct
 from twisted.trial import unittest
 from twisted.test.proto_helpers import StringTransport
 
-from nbd.nbd import NBDServerProtocol
+from sbnbd.nbd import NBDServerProtocol
 
 class StringBlockDevice(object):
     '''

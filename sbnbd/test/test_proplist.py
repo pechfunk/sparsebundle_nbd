@@ -1,5 +1,5 @@
 from twisted.trial import unittest
-from nbd import proplist
+from sbnbd import proplist
 from StringIO import StringIO
 
 class PropListTest(unittest.TestCase):

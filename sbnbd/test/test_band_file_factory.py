@@ -1,7 +1,7 @@
 from errno import ENOENT
 from os import SEEK_SET
 from twisted.trial import unittest
-from nbd.blockdev import BandFileFactory, FixedSizeEmptyReadOnlyFile,\
+from sbnbd.blockdev import BandFileFactory, FixedSizeEmptyReadOnlyFile,\
     PaddedFile
 from StringIO import StringIO
 

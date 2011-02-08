@@ -1,9 +1,9 @@
 import os
 import sys
 from twisted.internet import protocol, reactor
-from nbd.nbd import NBDServerProtocol
-from nbd.blockdev import BandBlockDevice, BandFileFactory
-from nbd.proplist import parse
+from sbnbd.nbd import NBDServerProtocol
+from sbnbd.blockdev import BandBlockDevice, BandFileFactory
+from sbnbd.proplist import parse
 
 class NBDFactory(protocol.ServerFactory):
     protocol = NBDServerProtocol
