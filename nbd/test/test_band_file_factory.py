@@ -12,7 +12,7 @@ class BandFileFactoryReadingTest(unittest.TestCase):
         self.fileOpenings = []
         self.pretendFileExists = True
         self.pretendFileIsFull = True
-        self.bff = BandFileFactory(self.dirName, bandSize=self.bandSize,
+        self.bff = BandFileFactory(self.dirName, 
                                    writable=False, 
                                    fileCtor=self.fakeFile,
                                    fileSize = self.fakeFileSize)
@@ -34,7 +34,7 @@ class BandFileFactoryReadingTest(unittest.TestCase):
             return 5
 
     def test_open_existing_band_0(self):
-        f = self.bff.getBand(0)
+        f = self.bff.getBand(0, self.bandSize)
         self.assertEquals(1, len(self.fileOpenings))
         good = 'hello /bla/0'
         s = f.read(len(good)+2)
@@ -45,12 +45,12 @@ class BandFileFactoryReadingTest(unittest.TestCase):
         self.assertEquals(' '*4, f.read(4))
 
     def test_open_existing_band_31(self):
-        f = self.bff.getBand(31)
+        f = self.bff.getBand(31, self.bandSize)
         self.assertEquals([('/bla/1f', 'rb')], self.fileOpenings)
 
     def test_open_nonexisting_band_returns_all_zero_file(self):
         self.pretendFileExists = False
-        f = self.bff.getBand(255)
+        f = self.bff.getBand(255, self.bandSize)
         self.assertEquals(1, len(self.fileOpenings))
         self.assertEquals(('/bla/ff', 'rb'), self.fileOpenings[0])
         self.assertEquals('\0'*13, f.read(13))
@@ -59,7 +59,7 @@ class BandFileFactoryReadingTest(unittest.TestCase):
 
     def test_open_too_short_file(self):
         self.pretendFileIsFull = False
-        f = self.bff.getBand(255)
+        f = self.bff.getBand(255, self.bandSize)
         self.assertEquals('hello\0', f.read(6))
         f.seek(self.bandSize - 5, SEEK_SET)
         self.assertEquals('\0'*5, f.read(5))

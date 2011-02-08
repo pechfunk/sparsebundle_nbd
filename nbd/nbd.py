@@ -116,19 +116,27 @@ class NBDServerProtocol(protocol.Protocol):
     '''
 
     
-    def __init__(self, blockdev):
+    def __init__(self, blockdev = None):
         '''
         Constructor
         '''
         self.blockdev = blockdev
         
     def connectionMade(self):
-        size = self.blockdev.sizeBytes()
+        blockdev = self._getBlockdev()
+        size = blockdev.sizeBytes()
         self.transport.write(SERVER_MAGIC + struct.pack('>Q', size) + '\0' * 124)
-        self.state = ReadyState(transport = self.transport, blockdev = self.blockdev)
+        self.state = ReadyState(transport = self.transport, blockdev = blockdev)
         
     def dataReceived(self, bs):
         bytesRead = 0
         while bs != '':
             bytesRead, self.state = self.state.dataReceived(bs)
             bs = bs[bytesRead:]
+
+    def _getBlockdev(self):
+        bd = self.blockdev
+        if bd is None:
+            bd = self.factory.blockdev
+            assert bd is not None
+        return bd

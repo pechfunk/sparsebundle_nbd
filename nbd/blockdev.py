@@ -24,14 +24,19 @@ class BandBlockDevice(object):
     @ivar numBands: the number of bands
     
     @ivar bandSize: the size of the bands in bytes.
+
+    @ivar lastBandSize: the size of the last band in bytes
+
+    @ivar size: the size of the entire device in bytes
     
     @ivar bandFileFactory: gives me a file-like for a band number.  
     '''
-    def __init__(self, numBands, bandSize, bandFileFactory):
-        self.numBands = numBands
+    def __init__(self, totalSize, bandSize, bandFileFactory):
+        self.numBands = (totalSize + bandSize - 1) / bandSize
+        self.size = totalSize
         self.bandSize = bandSize
+        self.lastBandSize = totalSize - (self.numBands-1)*bandSize
         assert self.bandSize > 0
-        self.size = numBands * bandSize
         self.bandFileFactory = bandFileFactory
 
     def sizeBytes(self):
@@ -51,7 +56,7 @@ class BandBlockDevice(object):
         o = offset % self.bandSize
         remSize = size
         while remSize > 0:
-            f = self.bandFileFactory.getBand(i)
+            f = self._getBand(i)
             f.seek(o, os.SEEK_SET)
             if o + remSize > self.bandSize:
                 s = self.bandSize - o
@@ -73,7 +78,7 @@ class BandBlockDevice(object):
         remSize = len(data)
         so = 0
         while remSize > 0:
-            f = self.bandFileFactory.getBand(i)
+            f = self._getBand(i)
             f.seek(o, 0)
             if o + remSize > self.bandSize:
                 s = self.bandSize - o
@@ -84,6 +89,16 @@ class BandBlockDevice(object):
             so += s
             o = 0
             i += 1
+
+    def _getBand(self, i):
+        if i < self.numBands - 1:
+            f = self.bandFileFactory.getBand(i, self.bandSize)
+        elif i == self.numBands - 1:
+            f = self.bandFileFactory.getBand(i, self.lastBandSize)
+        else:
+            raise AssertionError("invalid band index "+i)
+        return f
+
 
 class AbstractPaddedFile(object):
     def __init__(self, realSize, virtSize ):
@@ -170,26 +185,25 @@ class BandFileFactory(object):
     Find bands in an Apple-like bands directory.
     Band numbers are hex numbers without leading 0s.
     """
-    def __init__(self, dirName, bandSize, writable=False, fileCtor=file, fileSize=fileSize):
+    def __init__(self, dirName, writable=False, fileCtor=file, fileSize=fileSize):
         self.fileCtor = fileCtor
         self.fileSize = fileSize
-        self.bandSize = bandSize
         self.dirName = dirName
         if writable:
             self.openMode = 'r+b'
         else:
             self.openMode = 'rb'
         
-    def getBand(self, index):
+    def getBand(self, index, virtualSize):
         name = "%x"%index
         fullName = os.path.join(self.dirName, name)
         try:
             f =  (self.fileCtor)(fullName, self.openMode)
             realSize = (self.fileSize)(fullName)
-            wf =  PaddedFile(f, realSize, self.bandSize) 
+            wf =  PaddedFile(f, realSize, virtualSize) 
         except IOError, e:
             if e.errno == errno.ENOENT:
-                wf = FixedSizeEmptyReadOnlyFile(self.bandSize)
+                wf = FixedSizeEmptyReadOnlyFile(virtualSize)
             else:
                 raise
         return wf

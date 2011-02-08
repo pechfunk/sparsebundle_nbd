@@ -15,8 +15,9 @@ class DummyFileFactory(object):
         self.numBands = len(bandContents)
         self.bands = [StringIO(x) for x in bandContents]
         
-    def getBand(self, k):
+    def getBand(self, k, size):
         assert 0 <= k < self.numBands
+        assert len(self.bands[k].getvalue()) == size
         return self.bands[k]
     
     def bandContents(self):
@@ -38,7 +39,7 @@ class BandBlockDeviceReadTest(unittest.TestCase):
         numBands = 3
         bandSize = self.BAND_SIZE
         dff = DummyFileFactory(['ABCDEFGH', 'abcdefgh', '01234567'])
-        bd = BandBlockDevice(numBands, bandSize, dff)
+        bd = BandBlockDevice(numBands * bandSize, bandSize, dff)
         return bd
 
     def test_read_full_first_band(self):
@@ -108,7 +109,8 @@ class BandBlockDeviceWritingTest(unittest.TestCase):
         self.origBandContents =('ABCDEFGH', 'abcdefgh', '01234567')
         self.bandSize = 8
         self.dff = DummyFileFactory(self.origBandContents)
-        self.bd = BandBlockDevice(self.numBands, self.bandSize, self.dff)
+        self.bd = BandBlockDevice(self.numBands * self.bandSize, 
+            self.bandSize, self.dff)
 
     def test_write0(self):
         self.bd.write(5, '')
