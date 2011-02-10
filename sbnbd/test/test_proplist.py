@@ -3,6 +3,9 @@ from sbnbd import proplist
 from StringIO import StringIO
 
 class PropListTest(unittest.TestCase):
+    """
+    Unit test for the parse function
+    """
     def testParseTypical(self):
         text = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

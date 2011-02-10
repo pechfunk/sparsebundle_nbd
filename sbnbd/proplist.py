@@ -4,6 +4,9 @@ Proplist parser
 from xml.etree import ElementTree as ET
 
 def parse(filelike):
+    """Parser for the proplist files MacOS X uses to describe sparsebundles.
+    Not error-tolerant at all.
+    """
     data = {}
     et = ET.parse(filelike)
     plist = et.getroot()

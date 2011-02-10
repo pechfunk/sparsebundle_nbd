@@ -68,6 +68,7 @@ class BandBlockDevice(object):
             i += 1
 
     def write(self, offset, data):
+        "write the data to the given offset"
         if offset < 0:
             raise BlockDeviceException('negative offset: '+offset)
         if offset + len(data) > self.size:
@@ -91,6 +92,7 @@ class BandBlockDevice(object):
             i += 1
 
     def _getBand(self, i):
+        "Get a filelike for the ith band"
         if i < self.numBands - 1:
             f = self.bandFileFactory.getBand(i, self.bandSize)
         elif i == self.numBands - 1:
@@ -101,13 +103,20 @@ class BandBlockDevice(object):
 
 
 class AbstractPaddedFile(object):
+    """
+    Superclass for file-likes with a fixed virtual size, either backed by
+    another file, or entirely simulated. Subclasses must override _innerRead
+    and _doSeek.
+    """
     def __init__(self, realSize, virtSize ):
+        "Init with a backing file of size realSize, reading NULs up to virtSize"
         self.realSize = realSize
         self.virtSize = virtSize
 
     def read(self, size):
         """
         Read bytes. Must give the expected size.
+        May return fewer bytes, just like read() calls are wont to do.
         """
         s, pos = self._innerRead(size)
         if len(s) < size:
@@ -128,12 +137,15 @@ class AbstractPaddedFile(object):
         return s
 
     def seek(self, pos, whence=os.SEEK_SET):
+        "Seek to a position. Only SEEK_SET supported."
         self._doSeek(pos, whence)
     
     def _innerRead(self, size):
+        "Read up to that many bytes from current position. Return (buf, pos_after)"
         raise NotImplementedError()
 
     def _doSeek(self, pos, whence):
+        "Seek to that position. Only SEEK_SET supported."
         raise NotImplementedError()
 
 class PaddedFile(AbstractPaddedFile):
@@ -141,34 +153,49 @@ class PaddedFile(AbstractPaddedFile):
     Wrap a file, pretending it has been NUL-padded to a certain size.
     """
     def __init__(self, f, realSize, virtSize):
+        """
+        Wrap file f. It is believed to have size realSize. Pretend it
+        is virtSize bytes long by appending NULs.
+        """
         super(PaddedFile, self).__init__(realSize, virtSize)
         self.f = f
         self.pos = 0
 
     def _innerRead(self, size):
+        "read from the inner file"
         s = self.f.read(size)
         self.pos += len(s)
         return (s, self.pos)
 
     def _doSeek(self, pos, whence):
+        "seek"
         self.f.seek(pos, whence)
         self.pos = pos
 
     def tell(self):
+        "current position, as in files"
         return self.pos
                 
 class FixedSizeEmptyReadOnlyFile(AbstractPaddedFile):
+    """
+    A file-like which behaves like an empty read-only file of 
+    a given number of NUL bytes.
+    I still keep track of the current position.
+    """
     def __init__(self, size):
+        "Init with a given virtual size"
         super(FixedSizeEmptyReadOnlyFile, self).__init__(0, size)
         self.pos = 0
         self.hasSeekedSinceLastRead = True
 
     def _innerRead(self, size):
+        "Just adjust the position."
         assert self.hasSeekedSinceLastRead
         self.hasSeekedSinceLastRead = False
         return ('', self.pos)
     
     def _doSeek(self, pos, whence):
+        "Set the position"
         assert whence == os.SEEK_SET
         self.pos = pos
         self.hasSeekedSinceLastRead = True
@@ -176,6 +203,7 @@ class FixedSizeEmptyReadOnlyFile(AbstractPaddedFile):
         return self.pos
 
 def fileSize(f):
+    "Size of a file with name f"
     st = os.stat(f)
     return st[stat.ST_SIZE]
 
@@ -186,6 +214,13 @@ class BandFileFactory(object):
     Band numbers are hex numbers without leading 0s.
     """
     def __init__(self, dirName, writable=False, fileCtor=file, fileSize=fileSize):
+        """
+        New instance. dirName is the name of the directory containing the
+        Info.plist file (not the bands directory!). writable makes the file
+        writable, default is read-only. fileCtor is for testing (factory
+        for file-likes). fileSize is for testing (given a filename, return
+            its size)
+        """
         self.fileCtor = fileCtor
         self.fileSize = fileSize
         self.dirName = dirName
@@ -195,6 +230,8 @@ class BandFileFactory(object):
             self.openMode = 'rb'
         
     def getBand(self, index, virtualSize):
+        """Get the band with the given index, and wrap it to behave 
+        as if it had size virtualSize"""
         name = "%x"%index
         fullName = os.path.join(self.dirName, name)
         try:

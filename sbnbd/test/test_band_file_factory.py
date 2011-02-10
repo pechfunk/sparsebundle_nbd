@@ -6,6 +6,11 @@ from sbnbd.blockdev import BandFileFactory, FixedSizeEmptyReadOnlyFile,\
 from StringIO import StringIO
 
 class BandFileFactoryReadingTest(unittest.TestCase):
+    """
+    Unit test for BandFileFactory. 
+    
+    Test BandFileFactory and the wrapped files it returns.
+    """
     def setUp(self):
         self.dirName = "/bla/"
         self.bandSize = 40
@@ -18,6 +23,7 @@ class BandFileFactoryReadingTest(unittest.TestCase):
                                    fileSize = self.fakeFileSize)
         
     def fakeFile(self, filename, mode):
+        "Stub for file constructor"
         self.fileOpenings.append((filename, mode))
         if self.pretendFileExists:
             if self.pretendFileIsFull:
@@ -28,6 +34,7 @@ class BandFileFactoryReadingTest(unittest.TestCase):
             raise IOError(ENOENT, "No hay")
 
     def fakeFileSize(self, filename):
+        "Stub for the function which computes file sizes"
         if self.pretendFileIsFull:
             return self.bandSize
         else:
@@ -65,6 +72,9 @@ class BandFileFactoryReadingTest(unittest.TestCase):
         self.assertEquals('\0'*5, f.read(5))
 
 class FixedSizeEmptyReadOnlyFileTest(unittest.TestCase):
+    """
+    Unit test for FixedSizeEmptyReadOnlyFile
+    """
     def test_read_size_0(self):
         f = FixedSizeEmptyReadOnlyFile(0)
         s = f.read(5)
@@ -118,6 +128,9 @@ class TricklingReadFileWrapper(object):
         return self.f.tell()
 
 class PaddedFileTest(unittest.TestCase):
+    """
+    Unit test for PaddedFile
+    """
     def setUp(self):
         self.f = StringIO("0123456789")
         self.tfw = TricklingReadFileWrapper(self.f, 4)

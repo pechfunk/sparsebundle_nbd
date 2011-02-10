@@ -11,7 +11,11 @@ from StringIO import StringIO
 from sbnbd.blockdev import BandBlockDevice, BlockDeviceException
 
 class DummyFileFactory(object):
+    """
+    Dummy implementation of file factories (for BandBlockDevice)
+    """
     def __init__(self, bandContents):
+        "Init with a list of strings, StringIOs will be made of which"
         self.numBands = len(bandContents)
         self.bands = [StringIO(x) for x in bandContents]
         
@@ -25,6 +29,7 @@ class DummyFileFactory(object):
         return tuple([x.getvalue() for x in self.bands])
 
 def y(strs):
+    "Join an iterable of strings (to assert string generator contents)"
     return ''.join(strs)
 
 class BandBlockDeviceReadTest(unittest.TestCase):
